@@ -1,75 +1,67 @@
-import psycopg2
+from os import getenv
 
+import psycopg2
+from dotenv import load_dotenv
+load_dotenv()
 
 class DB:
-    con = psycopg2.connect(
-        dbname='instagramtiktokdownloader',
-        user='postgres',
-        host='localhost',
-        password='1',
-        port=5432
+    connection = psycopg2.connect(
+        dbname=getenv('DB_NAME'),
+        user=getenv('DB_USER'),
+        host=getenv('DB_HOST'),
+        password=getenv('DB_PASSWORD'),
+        port=getenv('DB_PORT')
     )
 
-    cur = con.cursor()
+    cursor = connection.cursor()
 
     def insert(self):
-        d = self.__dict__
-        del d['cols']
+        self_dict = self.__dict__
+        del self_dict['param']
         table_name = self.__class__.__name__.lower() + "s"
-        keys = [k for k, v in d.items() if v is not None]
-        col_names = " , ".join(keys)
-        format = " , ".join(["%s"] * len(keys))
-        params = [v for v in d.values() if v is not None]
-        query = f"""
-            insert into {table_name} ({col_names}) values ({format})
-        """
-        print(query)
-        print(params)
-        self.cur.execute(query, params)
-        self.con.commit()
+        col_name = " , ".join(self_dict.keys())
+        format = " , ".join(["%s"] * len(self_dict.values()))
+        params = tuple(self_dict.values())
+        query = f"insert into {table_name} ({col_name}) values ({format})"
+        self.cursor.execute(query, params)
+        self.connection.commit()
 
     def select(self, **conditions):
-        table_name = self.__class__.__name__.lower() + "s"
-        col_names = "*"
-        conditions_format = ""
-        if self.cols:
-            col_names = " , ".join(self.cols)
+        condition = ""
         if conditions:
-            conditions_format = " where " + " = %s and ".join(conditions.keys()) + " = %s"
-        params = tuple(conditions.values())
-        query = f"""
-             select {col_names} from {table_name} {conditions_format}
-        """
-        self.cur.execute(query, params)
-        return self.cur.fetchall()
+            condition = "where " + " = %s and ".join(conditions.keys()) + " = %s"
 
-    def delete(self, **conditions):
-        table_name = self.__class__.__name__.lower() + "s"
-        conditions_format = ""
-        if conditions:
-            conditions_format = " where " + " = %s and ".join(conditions.keys()) + " = %s"
+        if not self.param:
+            field = "*"
+        else:
+            field = " , ".join(self.param)
         params = tuple(conditions.values())
-        query = f"""
-            delete from {table_name} {conditions_format}
-        """
-        self.cur.execute(query, params)
-        self.con.commit()
+        table_name = self.__class__.__name__.lower() + "s"
+        query = f"select {field} from {table_name} {condition}"
+        self.cursor.execute(query, params)
+        data = self.cursor.fetchall()
+        return data
 
     def update(self, **conditions):
-        d = self.__dict__
-        del d['cols']
-        table_name = self.__class__.__name__.lower() + "s"
-        keys = [k for k, v in d.items() if v is not None]
-        values = [v for v in d.values() if v is not None]
         conditions_format = ""
         if conditions:
-            conditions_format = " where " + " = %s and ".join(conditions.keys()) + " = %s"
-        set_format = " = %s , ".join(keys) + "= %s"
-        query = f"""
-            update {table_name} set {set_format} {conditions_format}
-        """
-        params = tuple(values + list(conditions.values()))
-        self.cur.execute(query, params)
-        self.con.commit()
+            conditions_format = "where " + " = %s and ".join(conditions.keys()) + " = %s"
+        self_dict = self.__dict__
+        del self_dict['param']
+        table_name = self.__class__.__name__.lower() + "s"
+        keys = [k for k, v in self_dict.items() if not v is None]
+        params = [v for k, v in self_dict.items() if not v is None]
+        params.extend(conditions.values())
+        set_format = " = %s , ".join(keys) + " = %s"
+        query = f"""update {table_name} set {set_format} {conditions_format} """
+        self.cursor.execute(query, tuple(params))
+        self.connection.commit()
 
-
+    def delete(self, **conditions):
+        if conditions:
+            condition_format = "where " + " = %s and ".join(conditions.keys()) + " = %s"
+        params = tuple(conditions.values())
+        table_name = self.__class__.__name__.lower() + "s"
+        query = f"""delete from {table_name} {condition_format}"""
+        self.cursor.execute(query, params)
+        self.connection.commit()

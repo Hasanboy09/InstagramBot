@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import sys
+from os import getenv
 
 from aiogram import Bot, Dispatcher, html, F
 from aiogram.client.default import DefaultBotProperties
@@ -9,9 +10,11 @@ from aiogram.filters import CommandStart
 from aiogram.types import Message
 
 from api import tiktok, instagram, facebook, snapchat
-from models import User
+from models import Customer
+from dotenv import load_dotenv
 
-TOKEN = '7460589468:AAGBO8NYVTFX7Bscr_7QC9a6693IawSwr3s'
+load_dotenv()
+TOKEN = getenv('TOKEN')
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 dp = Dispatcher()
@@ -20,13 +23,13 @@ dp = Dispatcher()
 @dp.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
     user = {
-        "user_id": message.from_user.id,
+        "id": message.from_user.id,
         "first_name": message.from_user.first_name,
         "last_name": message.from_user.last_name,
         "username": message.from_user.username,
     }
-    user = User(**user)
-    if not user.select(user_id=message.from_user.id):
+    user = Customer(**user)
+    if not user.select(id=message.from_user.id):
         user.insert()
     await message.answer(f"Hello, {html.bold(message.from_user.full_name)}!")
     await message.answer('Send a link')
